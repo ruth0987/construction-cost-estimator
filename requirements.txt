@@ -8,3 +8,5 @@ langchain-text-splitters
 langchain-groq
 pypdf
 langchain-chroma
+sentence-transformers
+torch
