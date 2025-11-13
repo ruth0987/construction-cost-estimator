@@ -82,20 +82,54 @@ st.markdown("""
 # Configuration
 # -----------------------------
 # Get Groq API Key from Streamlit secrets or environment variable
-try:
-    # Try to get from Streamlit secrets first
-    if hasattr(st, 'secrets') and "GROQ_API_KEY" in st.secrets:
-        groq_api_key = st.secrets["GROQ_API_KEY"]
-    else:
-        groq_api_key = os.environ.get("GROQ_API_KEY")
-except (AttributeError, KeyError, TypeError):
-    # Fallback to environment variable if secrets not available
-    groq_api_key = os.environ.get("GROQ_API_KEY")
+groq_api_key = None
 
+# Try to get from Streamlit secrets first (preferred method)
+try:
+    # Access secrets like a dictionary
+    if hasattr(st, 'secrets'):
+        try:
+            groq_api_key = st.secrets["GROQ_API_KEY"]
+        except KeyError:
+            # Key not found in secrets, try environment variable
+            pass
+except (AttributeError, TypeError):
+    # Streamlit secrets not available
+    pass
+
+# Fallback to environment variable if not found in secrets
 if not groq_api_key:
-    st.error("⚠️ GROQ_API_KEY not found! Please set it in Streamlit secrets (in .streamlit/secrets.toml for local or Streamlit Cloud secrets) or as an environment variable.")
+    groq_api_key = os.environ.get("GROQ_API_KEY", None)
+
+# Validate API key exists
+if not groq_api_key:
+    st.error("""
+    ⚠️ **GROQ_API_KEY not found!**
+    
+    Please set your Groq API key in one of the following ways:
+    
+    **For Streamlit Cloud:**
+    1. Go to your app settings in Streamlit Cloud
+    2. Click on "Secrets" tab
+    3. Add the following:
+    ```
+    GROQ_API_KEY = "your-groq-api-key-here"
+    ```
+    
+    **For Local Development:**
+    1. Create a file: `.streamlit/secrets.toml`
+    2. Add the following:
+    ```
+    GROQ_API_KEY = "your-groq-api-key-here"
+    ```
+    
+    **Get your API key:**
+    - Sign up at https://console.groq.com/
+    - Create an API key from the dashboard
+    """)
     st.stop()
 
+# Set the API key in environment for LangChain to use
 os.environ["GROQ_API_KEY"] = groq_api_key
 
 # -----------------------------
@@ -208,9 +242,51 @@ ENHANCED_SAMPLE_DATA = [
 @st.cache_resource
 def initialize_models():
     """Initialize LLM and embeddings (cached)."""
-    llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0) 
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    return llm, embeddings
+    # Get API key from environment (set at the top of the file)
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        st.error("⚠️ GROQ_API_KEY not set in environment. Please check your secrets configuration.")
+        st.stop()
+    
+    # Validate API key format (Groq API keys typically start with 'gsk_')
+    if not api_key.startswith("gsk_"):
+        st.warning("⚠️ Warning: GROQ_API_KEY doesn't appear to be in the correct format (should start with 'gsk_'). Please verify your API key.")
+    
+    try:
+        # Initialize ChatGroq - it will automatically read GROQ_API_KEY from environment
+        # We've already set it in os.environ at the top of the file
+        llm = ChatGroq(
+            model="openai/gpt-oss-20b", 
+            temperature=0
+        ) 
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        return llm, embeddings
+    except Exception as e:
+        error_msg = str(e)
+        st.error(f"⚠️ **Error initializing Groq LLM:** {error_msg}")
+        
+        # Provide helpful error messages based on common issues
+        if "api_key" in error_msg.lower() or "authentication" in error_msg.lower() or "401" in error_msg or "403" in error_msg:
+            st.error("""
+            **Authentication Error Detected**
+            
+            This usually means:
+            1. Your API key is invalid or expired
+            2. Your API key doesn't have the required permissions
+            3. Your API key format is incorrect
+            
+            **To fix:**
+            1. Go to https://console.groq.com/
+            2. Check your API keys
+            3. Create a new API key if needed
+            4. Update your secrets in Streamlit Cloud with the new key
+            """)
+        elif "rate limit" in error_msg.lower() or "429" in error_msg:
+            st.warning("⚠️ Rate limit reached. Please wait a moment and try again.")
+        else:
+            st.error("Please check that your GROQ_API_KEY is valid and has not expired.")
+        
+        st.stop()
 
 @st.cache_resource
 def initialize_vectorstore(_embeddings, persist_dir: str = "./cost_chroma_db"):
