@@ -1,12 +1,17 @@
 streamlit
 pandas
 pydantic
+# LangChain Core Libraries
 langchain-core
-langchain-huggingface
 langchain-community
-langchain-text-splitters
+# Groq LLM Integration
 langchain-groq
-pypdf
+# Vector Store and Embeddings
 langchain-chroma
+langchain-huggingface
+# Specific library dependencies for HuggingFaceEmbeddings/LLMs
 sentence-transformers
-torch
+# Pinning torch for stability on Streamlit Cloud's CPU environment
+torch==2.3.0 
+# Required for the pydantic models' data types
+typing_extensions
