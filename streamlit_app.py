@@ -81,8 +81,22 @@ st.markdown("""
 # -----------------------------
 # Configuration
 # -----------------------------
-# NOTE: Replace with your actual Groq API Key
-os.environ.setdefault("GROQ_API_KEY", "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")
+# Get Groq API Key from Streamlit secrets or environment variable
+try:
+    # Try to get from Streamlit secrets first
+    if hasattr(st, 'secrets') and "GROQ_API_KEY" in st.secrets:
+        groq_api_key = st.secrets["GROQ_API_KEY"]
+    else:
+        groq_api_key = os.environ.get("GROQ_API_KEY")
+except (AttributeError, KeyError, TypeError):
+    # Fallback to environment variable if secrets not available
+    groq_api_key = os.environ.get("GROQ_API_KEY")
+
+if not groq_api_key:
+    st.error("⚠️ GROQ_API_KEY not found! Please set it in Streamlit secrets (in .streamlit/secrets.toml for local or Streamlit Cloud secrets) or as an environment variable.")
+    st.stop()
+
+os.environ["GROQ_API_KEY"] = groq_api_key
 
 # -----------------------------
 # Pydantic Models (as provided)
